@@ -1,5 +1,7 @@
 # FishBoss
 
+> **AI 开发平台** — 本项目仍处于**积极开发**状态，部分功能正在迭代中。
+
 AI Agent 编排平台，支持对话管理、智能体、工作流、工具调用和 MCP (Model Context Protocol)。
 
 ## 功能特性
@@ -42,7 +44,7 @@ fishboss/
 │       ├── stores/         # Pinia 状态
 │       └── services/       # API 服务
 ├── dist/                   # 构建产物
-└── 项目文档/                 # 项目文档
+└── docs/                     # 项目文档
 ```
 
 ## 快速开始
