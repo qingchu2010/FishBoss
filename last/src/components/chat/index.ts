@@ -1,6 +1,0 @@
-export { default as ConversationsSidebar } from './ConversationsSidebar.vue'
-export { default as AgentSelector } from './AgentSelector.vue'
-export { default as ToolCallsDisplay } from './ToolCallsDisplay.vue'
-export { default as MessageItem } from './MessageItem.vue'
-export { default as ChatInput } from './ChatInput.vue'
-export { default as AskInline } from './AskInline.vue'
