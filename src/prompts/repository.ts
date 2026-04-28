@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, mkdirSync } from 'fs';
 import { join, basename } from 'path';
 import { getStoragePaths } from '../storage/paths.js';
+import { getLogger } from '../server/logging/index.js';
 
 export interface PromptFile {
   name: string;
@@ -9,6 +10,7 @@ export interface PromptFile {
 }
 
 const PROMPTS_DIR = getStoragePaths().prompts;
+const logger = getLogger();
 
 function ensurePromptsDir(): void {
   if (!existsSync(PROMPTS_DIR)) {
@@ -30,7 +32,11 @@ export async function listPrompts(): Promise<PromptFile[]> {
     let content: string | null = null;
     try {
       content = readFileSync(filePath, 'utf-8');
-    } catch {
+    } catch (error) {
+      logger.warn('Failed to read prompt file', {
+        path: filePath,
+        error: String(error),
+      });
       content = null;
     }
     return { name, path: filePath, content };
@@ -45,7 +51,12 @@ export async function loadPrompt(name: string): Promise<string | null> {
   }
   try {
     return readFileSync(filePath, 'utf-8');
-  } catch {
+  } catch (error) {
+    logger.warn('Failed to load prompt', {
+      name,
+      path: filePath,
+      error: String(error),
+    });
     return null;
   }
 }

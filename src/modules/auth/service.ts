@@ -25,6 +25,9 @@ import {
   type SessionData,
 } from './session.js';
 import type { FastifyReply } from 'fastify';
+import { getLogger } from '../../server/logging/index.js';
+
+const logger = getLogger();
 
 export enum AuthErrorCode {
   AUTH_SETUP_REQUIRED = 'AUTH_SETUP_REQUIRED',
@@ -139,7 +142,7 @@ export async function bootstrap(
   }
   const passwordHash = await hashPassword(password);
   const admin = createAdmin(username, displayName, passwordHash);
-  console.log('Admin bootstrap successful', { username, ip });
+  logger.info('Admin bootstrap successful', { username, ip });
   const session = createSession(admin.id, admin.username, userAgent, ip);
   setSessionCookie(reply, session);
   return {
@@ -164,23 +167,23 @@ export async function login(
 ): Promise<LoginResult | AuthError> {
   const admin = loadAdmin();
   if (!admin) {
-    console.log('Login failed: no admin', { username, ip });
+    logger.warn('Login failed: no admin', { username, ip });
     return { code: AuthErrorCode.AUTH_INVALID_CREDENTIALS, message: 'Invalid username or password' };
   }
   if (admin.username !== username) {
-    console.log('Login failed: username mismatch', { username, ip });
+    logger.warn('Login failed: username mismatch', { username, ip });
     return { code: AuthErrorCode.AUTH_INVALID_CREDENTIALS, message: 'Invalid username or password' };
   }
   if (admin.disabled) {
-    console.log('Login failed: account disabled', { username, ip });
+    logger.warn('Login failed: account disabled', { username, ip });
     return { code: AuthErrorCode.AUTH_ACCOUNT_DISABLED, message: 'Account is disabled' };
   }
   const validPassword = await verifyPassword(password, admin.passwordHash);
   if (!validPassword) {
-    console.log('Login failed: invalid password', { username, ip });
+    logger.warn('Login failed: invalid password', { username, ip });
     return { code: AuthErrorCode.AUTH_INVALID_CREDENTIALS, message: 'Invalid username or password' };
   }
-  console.log('Login successful', { username, ip });
+  logger.info('Login successful', { username, ip });
   const session = createSession(admin.id, admin.username, userAgent, ip);
   setSessionCookie(reply, session);
   return {
@@ -195,7 +198,7 @@ export async function login(
 export function logout(sessionId: string, reply: FastifyReply): void {
   deleteSession(sessionId);
   clearSessionCookie(reply);
-  console.log('Logout successful', { sessionIdHash: hashSessionId(sessionId) });
+  logger.info('Logout successful', { sessionIdHash: hashSessionId(sessionId) });
 }
 
 export interface MeResult {
@@ -250,7 +253,7 @@ export async function changePassword(
   const newHash = await hashPassword(newPassword);
   updateAdminPassword(newHash);
   deleteAllSessionsExcept(sessionId);
-  console.log('Password changed successfully', { username: admin.username });
+  logger.info('Password changed successfully', { username: admin.username });
   return { success: true };
 }
 

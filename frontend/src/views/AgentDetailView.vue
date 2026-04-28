@@ -137,7 +137,8 @@ async function saveAgent() {
       }
     })
     appStore.notify(t('page.agents.agentUpdated'), 'success')
-  } catch (e) {
+  } catch (error) {
+    console.error('Failed to save agent', error)
     appStore.notify(t('settings.saveFailed'), 'error')
   } finally {
     saving.value = false

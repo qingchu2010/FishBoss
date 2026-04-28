@@ -3,6 +3,9 @@ import { join } from 'path';
 import { getStoragePaths } from '../../storage/index.js';
 import type { SessionData } from './session.js';
 import { hashSessionId } from './session.js';
+import { getLogger } from '../../server/logging/index.js';
+
+const logger = getLogger();
 
 export interface AdminData {
   id: string;
@@ -55,7 +58,7 @@ export function loadAdmin(): AdminData | null {
     const data = readFileSync(adminPath, 'utf-8');
     return JSON.parse(data) as AdminData;
   } catch (error) {
-    console.error('Failed to load admin data', error);
+    logger.error('Failed to load admin data', error, { path: adminPath });
     return null;
   }
 }
@@ -108,7 +111,9 @@ export function loadSession(sessionId: string): SessionData | null {
     const data = readFileSync(sessionPath, 'utf-8');
     return JSON.parse(data) as SessionData;
   } catch (error) {
-    console.error('Failed to load session data', error);
+    logger.error('Failed to load session data', error, {
+      sessionIdHash,
+    });
     return null;
   }
 }
@@ -137,7 +142,7 @@ export function deleteAllSessionsExcept(sessionId: string): void {
     try {
       unlinkSync(join(sessionsDir, file));
     } catch (error) {
-      console.error('Failed to delete session file', error);
+      logger.error('Failed to delete session file', error, { file });
     }
   }
 }
@@ -150,7 +155,7 @@ export function deleteAllSessions(): void {
     try {
       unlinkSync(join(sessionsDir, file));
     } catch (error) {
-      console.error('Failed to delete session file', error);
+      logger.error('Failed to delete session file', error, { file });
     }
   }
 }
@@ -172,7 +177,7 @@ export function cleanupExpiredSessions(): { deleted: number } {
         deleted++;
       }
     } catch (error) {
-      console.error('Failed to clean expired session', error);
+      logger.error('Failed to clean expired session', error, { file });
     }
   }
   return { deleted };

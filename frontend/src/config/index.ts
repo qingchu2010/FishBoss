@@ -13,7 +13,7 @@ export const ROUTES = {
   WORKFLOWS: '/workflows',
   PLATFORMS: '/platforms',
   GROUPS: '/groups',
-  MEDIA: '/media',
+  DATABASE: '/database',
   SETTINGS: '/settings',
   LOGS: '/logs'
 } as const

@@ -5,6 +5,9 @@ import type {
   SendMessageResult,
 } from '../schema.js';
 import { z } from 'zod';
+import { getLogger } from '../../../server/logging/index.js';
+
+const logger = getLogger();
 
 const QQBotTypeSchema = z.enum(['c2c', 'group', 'guild']);
 
@@ -241,13 +244,15 @@ export const qqAdapter: PlatformAdapter = {
       });
 
       if (!response.ok) {
-        console.error(`QQ access token request failed: ${response.status}`);
+        logger.error('QQ access token request failed', undefined, {
+          status: response.status,
+        });
         return null;
       }
 
       const data = await response.json() as QQTokenData & { code?: number };
       if (data.code !== 0 && data.code !== undefined) {
-        console.error(`QQ access token error: ${data.code}`);
+        logger.error('QQ access token error', undefined, { code: data.code });
         return null;
       }
 
@@ -256,7 +261,7 @@ export const qqAdapter: PlatformAdapter = {
         expiresAt: Date.now() + data.expires_in * 1000,
       };
     } catch (error) {
-      console.error('Failed to fetch QQ access token:', error);
+      logger.error('Failed to fetch QQ access token', error);
       return null;
     }
   },
@@ -361,7 +366,10 @@ export const qqAdapter: PlatformAdapter = {
 
         if (!response.ok) {
           const responseText = await response.text();
-          console.error(`QQ send message failed: ${response.status}`, responseText);
+          logger.error('QQ send message failed', undefined, {
+            status: response.status,
+            response: responseText.slice(0, 500),
+          });
           return null;
         }
 
@@ -371,7 +379,7 @@ export const qqAdapter: PlatformAdapter = {
           timestamp: data.timestamp ?? Date.now(),
         };
       } catch (error) {
-        console.error('Failed to send QQ message:', error);
+        logger.error('Failed to send QQ message', error);
         return null;
       }
     }

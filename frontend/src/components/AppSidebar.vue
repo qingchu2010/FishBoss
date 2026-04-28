@@ -7,14 +7,13 @@ import {
   Bot,
   Boxes,
   Cable,
-  FolderKanban,
-  Code2,
+  ChevronLeft,
+  Database,
   Puzzle,
   RadioTower,
   ScrollText,
   Users,
-  Settings,
-  GitBranch
+  Settings
 } from 'lucide-vue-next'
 import { useAppStore } from '@/stores'
 import { ROUTES } from '@/config'
@@ -26,7 +25,7 @@ const LAST_CONVERSATION_ROUTE_KEY = 'fishboss:last-conversation-route'
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const navItems = computed(() => [
   { path: ROUTES.DASHBOARD, label: t('nav.dashboard'), icon: LayoutDashboard },
@@ -35,7 +34,7 @@ const navItems = computed(() => [
   { path: ROUTES.WORKFLOWS, label: t('nav.workflows'), icon: Boxes },
   { path: ROUTES.PLATFORMS, label: t('nav.platforms'), icon: Cable },
   { path: ROUTES.GROUPS, label: t('nav.groups'), icon: Users },
-  { path: ROUTES.MEDIA, label: t('nav.media'), icon: FolderKanban },
+  { path: ROUTES.DATABASE, label: t('nav.database'), icon: Database },
   { path: ROUTES.PROVIDERS, label: t('nav.modelProviders'), icon: Bot },
   { path: ROUTES.MCP, label: t('nav.mcpServers'), icon: RadioTower },
   { path: ROUTES.SKILLS, label: t('nav.skills'), icon: Puzzle },
@@ -105,9 +104,7 @@ function navigate(path: string) {
     <div class="sidebar-footer">
       <button type="button" class="collapse-btn" @click="appStore.toggleSidebar">
         <span class="collapse-icon" :class="{ rotated: appStore.sidebarCollapsed }">
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-            <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <ChevronLeft :size="14" />
         </span>
       </button>
     </div>

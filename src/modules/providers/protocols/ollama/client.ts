@@ -1,16 +1,47 @@
 import { LLMClient, type LLMClientConfig, type ChatCompletionOptions, type ChatCompletionResponse, type ModelInfo } from '../base.js';
 import type { StreamChunk } from '../../../../types/provider.js';
+import { getLogger } from '../../../../server/logging/index.js';
+import { readNewlineDelimitedJson } from '../ndjson.js';
+
+const logger = getLogger();
 
 interface OllamaModelsResponse {
   models?: Array<{ name: string; model?: string; details?: { parameter_size?: string } }>;
 }
 
-interface OllamaChatResponse {
+export interface OllamaChatResponse {
   model: string;
   message?: { content: string };
   done: boolean;
   prompt_eval_count?: number;
   eval_count?: number;
+}
+
+export function toOllamaStreamChunks(data: OllamaChatResponse): StreamChunk[] {
+  const chunks: StreamChunk[] = [];
+
+  if (data.prompt_eval_count !== undefined || data.eval_count !== undefined) {
+    chunks.push({
+      delta: '',
+      done: false,
+      usage: {
+        promptTokens: data.prompt_eval_count,
+        completionTokens: data.eval_count,
+        totalTokens:
+          (data.prompt_eval_count ?? 0) + (data.eval_count ?? 0),
+      },
+    });
+  }
+
+  if (data.message?.content) {
+    chunks.push({ delta: data.message.content, done: false });
+  }
+
+  if (data.done) {
+    chunks.push({ delta: '', done: true });
+  }
+
+  return chunks;
 }
 
 export class OllamaClient extends LLMClient {
@@ -23,7 +54,9 @@ export class OllamaClient extends LLMClient {
       const response = await fetch(`${this.config.baseUrl}/api/tags`);
 
       if (!response.ok) {
-        console.log(`[Ollama] Error response: HTTP ${response.status}`);
+        logger.warn('Ollama model fetch returned an error response', {
+          status: response.status,
+        });
         return [];
       }
 
@@ -33,7 +66,7 @@ export class OllamaClient extends LLMClient {
         name: m.name || m.model,
       }));
     } catch (err) {
-      console.log(`[Ollama] Fetch error:`, err);
+      logger.warn('Ollama model fetch failed', { error: String(err) });
       return [];
     }
   }
@@ -102,50 +135,31 @@ export class OllamaClient extends LLMClient {
       throw new Error(`HTTP ${response.status}: ${error}`);
     }
 
-    const reader = response.body?.getReader();
-    if (!reader) {
+    const body = response.body;
+    if (!body) {
       throw new Error('No response body');
     }
 
-    const decoder = new TextDecoder();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        onChunk({ delta: '', done: true });
-        break;
-      }
-
-      const text = decoder.decode(value, { stream: true });
-      const lines = text.split('\n').filter(Boolean);
-
-      for (const line of lines) {
-        try {
-          const data = JSON.parse(line) as OllamaChatResponse;
-          if (data.prompt_eval_count !== undefined || data.eval_count !== undefined) {
-            onChunk({
-              delta: '',
-              done: false,
-              usage: {
-                promptTokens: data.prompt_eval_count,
-                completionTokens: data.eval_count,
-                totalTokens:
-                  (data.prompt_eval_count ?? 0) + (data.eval_count ?? 0),
-              },
-            });
-          }
-          if (data.message?.content) {
-            onChunk({ delta: data.message.content, done: false });
-          }
-          if (data.done) {
-            onChunk({ delta: '', done: true });
-            return;
-          }
-        } catch {
-          // Skip invalid JSON
+    for await (const data of readNewlineDelimitedJson<OllamaChatResponse>(
+      body,
+      {
+        onInvalidLine(line, error) {
+          logger.warn('Failed to parse Ollama stream line', {
+            line,
+            error: String(error),
+          });
+        },
+      },
+    )) {
+      for (const chunk of toOllamaStreamChunks(data)) {
+        onChunk(chunk);
+        if (chunk.done) {
+          return;
         }
       }
     }
+
+    onChunk({ delta: '', done: true });
   }
 
   async testConnection(model: string, testMessage?: string): Promise<{ success: boolean; latencyMs: number; error?: string }> {

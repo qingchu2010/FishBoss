@@ -5,6 +5,9 @@ import { resolveSafeJsonEntityPath } from '../../utils/path.js';
 import { generateId } from '../../utils/string.js';
 import { encryptApiKey, decryptApiKey } from '../../utils/crypto.js';
 import type { Platform } from './schema.js';
+import { getLogger } from '../../server/logging/index.js';
+
+const logger = getLogger();
 
 interface StoredPlatform {
   id: string;
@@ -44,7 +47,8 @@ export class PlatformRepository {
         const content = await fs.readFile(path.join(this.platformsPath, file), 'utf-8');
         const data = JSON.parse(content) as StoredPlatform;
         platforms.push(this.deserializePlatform(data));
-      } catch {
+      } catch (error) {
+        logger.error('Failed to read platform file', error, { file });
       }
     }
 

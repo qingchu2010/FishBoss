@@ -19,7 +19,7 @@ export interface VendorConfig {
   website?: string;
 }
 
-export interface VendorPreset extends VendorConfig {}
+export type VendorPreset = VendorConfig;
 
 export const VENDOR_IDS = {
   OPENAI: 'openai',

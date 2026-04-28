@@ -1,31 +1,49 @@
-import type { Workflow } from '../../types/workflow.js';
-
-export interface WorkflowStore {
-  list(): Promise<Workflow[]>;
-  get(id: string): Promise<Workflow | null>;
-  create(data: Partial<Workflow>): Promise<Workflow>;
-  update(id: string, data: Partial<Workflow>): Promise<Workflow>;
-  delete(id: string): Promise<void>;
-}
-
-export interface WorkflowRunner {
-  execute(workflowId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
-  stop(executionId: string): void;
-}
-
-export interface WorkflowExecutionContext {
-  executionId: string;
-  workflowId: string;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'stopped';
-  input: Record<string, unknown>;
-  output?: Record<string, unknown>;
-  error?: string;
-  startedAt?: Date;
-  stoppedAt?: Date;
-  currentStep?: string;
-}
-
 export { WorkflowService } from './service.js';
 export { createWorkflowRoutes, type WorkflowRoutes } from './routes.js';
-export { WorkflowRepository } from './repository.js';
-export * from './schema.js';
+export {
+  WorkflowDefinitionRepository,
+  WorkflowRunRepository,
+} from './repository.js';
+export {
+  WorkflowTriggerSourceSchema,
+  WorkflowRunStatusSchema,
+  WorkflowNodeStatusSchema,
+  WorkflowNodeTypeSchema,
+  WorkflowTriggerSchema,
+  WorkflowNodePositionSchema,
+  WorkflowEdgeMetadataSchema,
+  WorkflowEdgeSchema,
+  WorkflowNodeDefinitionSchema,
+  WorkflowDefinitionSchema,
+  WorkflowNodeStateSchema,
+  WorkflowRunSchema,
+  LegacyWorkflowStepSchema,
+  LegacyWorkflowSchema,
+  CreateWorkflowDefinitionInputSchema,
+  UpdateWorkflowDefinitionInputSchema,
+  RunWorkflowInputSchema,
+  WorkflowRunListQuerySchema,
+  WorkflowIdParamsSchema,
+  WorkflowRunIdParamsSchema,
+  toWorkflowDefinitionResponse,
+  toWorkflowRunResponse,
+  type WorkflowTrigger,
+  type WorkflowTriggerSource,
+  type WorkflowRunStatus,
+  type WorkflowNodeStatus,
+  type WorkflowNodeType,
+  type WorkflowNodePosition,
+  type WorkflowEdgeMetadata,
+  type WorkflowEdge,
+  type WorkflowNodeDefinition,
+  type WorkflowDefinition,
+  type WorkflowNodeState,
+  type WorkflowRun,
+  type LegacyWorkflow,
+  type CreateWorkflowDefinitionInput,
+  type UpdateWorkflowDefinitionInput,
+  type RunWorkflowInput,
+  type WorkflowRunListQuery,
+  type WorkflowIdParams,
+  type WorkflowRunIdParams,
+} from './schema.js';

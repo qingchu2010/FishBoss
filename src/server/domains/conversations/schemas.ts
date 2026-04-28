@@ -121,6 +121,12 @@ export const ConversationMetadataSchema = z
     providerId: z.string().optional(),
     modelId: z.string().optional(),
     ownerUserId: z.string().optional(),
+    conversationClass: z
+      .enum(["chat-console", "qq", "onebot", "platform"])
+      .optional(),
+    platformId: z.string().optional(),
+    platformType: z.string().optional(),
+    externalThreadId: z.string().optional(),
     tags: z.array(z.string()).optional(),
   })
   .optional();

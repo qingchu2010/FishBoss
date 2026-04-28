@@ -182,6 +182,10 @@ export class ToolRegistry {
 
 let globalRegistry: ToolRegistry | null = null;
 
+export function setToolRegistryForTests(registry: ToolRegistry | null): void {
+  globalRegistry = registry;
+}
+
 export function getToolRegistry(): ToolRegistry {
   if (!globalRegistry) {
     globalRegistry = new ToolRegistry();

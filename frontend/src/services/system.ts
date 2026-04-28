@@ -20,12 +20,11 @@ export interface SystemStats {
     data: number
     auth: number
     logs: number
-    media: number
+    database: number
     workflows: number
     providers: number
     mcp: number
     skills: number
-    frontendConfig: number
   }
   dashboard: {
     providers: {
@@ -62,12 +61,11 @@ export interface StorageInfo {
     data: string
     auth: string
     logs: string
-    media: string
+    database: string
     workflows: string
     providers: string
     mcp: string
     skills: string
-    frontendConfig: string
   }
   sizes: {
     prompts: number
@@ -75,12 +73,11 @@ export interface StorageInfo {
     data: number
     auth: number
     logs: number
-    media: number
+    database: number
     workflows: number
     providers: number
     mcp: number
     skills: number
-    frontendConfig: number
   }
 }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { AlertCircle, Boxes, Play, Plus, RefreshCw, Square, Trash2, Wrench } from 'lucide-vue-next'
+import { AlertCircle, Boxes, Play, Plus, Square, Trash2, Wrench } from 'lucide-vue-next'
 import { Card, CardContent } from '@/components'
 import { useAppStore, useMCPStore } from '@/stores'
 import { mcpApi } from '@/services/mcp'

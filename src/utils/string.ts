@@ -1,3 +1,7 @@
+import { getLogger } from "../server/logging/index.js";
+
+const logger = getLogger();
+
 export function generateId(): string {
   return crypto.randomUUID();
 }
@@ -14,7 +18,10 @@ export function sanitizeFilename(filename: string): string {
 export function parseJsonSafe<T>(json: string, fallback: T): T {
   try {
     return JSON.parse(json) as T;
-  } catch {
+  } catch (_error) {
+    logger.warn("Failed to parse JSON string", {
+      error: String(_error),
+    });
     return fallback;
   }
 }

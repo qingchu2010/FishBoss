@@ -1,5 +1,9 @@
 import { LLMClient, type LLMClientConfig, type ChatCompletionOptions, type ChatCompletionResponse, type ModelInfo } from '../base.js';
 import type { ProviderToolChoice, ProviderToolDefinition, StreamChunk } from '../../../../types/provider.js';
+import { getLogger } from '../../../../server/logging/index.js';
+import { readServerSentEvents } from '../sse.js';
+
+const logger = getLogger();
 
 interface OpenAIToolFunction {
   name?: string;
@@ -90,7 +94,7 @@ export class OpenAIClient extends LLMClient {
 
     for (const endpoint of endpoints) {
       const url = `${this.config.baseUrl}${endpoint}`;
-      console.log(`[OpenAI] Fetching models from: ${url}`);
+      logger.info('OpenAI model fetch started', { url });
       
       try {
         const headers: Record<string, string> = {
@@ -103,16 +107,26 @@ export class OpenAIClient extends LLMClient {
 
         const response = await fetch(url, { headers });
 
-        console.log(`[OpenAI] Response status: ${response.status}`);
+        logger.info('OpenAI model fetch response received', {
+          url,
+          status: response.status,
+        });
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.log(`[OpenAI] Error response: ${errorText}`);
+          logger.warn('OpenAI model fetch returned an error response', {
+            url,
+            status: response.status,
+            error: errorText,
+          });
           continue;
         }
 
         const data = (await response.json()) as OpenAIModelsResponse;
-        console.log(`[OpenAI] Models found: ${data.data?.length ?? 0}`);
+        logger.info('OpenAI models fetched', {
+          url,
+          count: data.data?.length ?? 0,
+        });
         
         if (data.data && data.data.length > 0) {
           return data.data.map((m) => ({
@@ -121,11 +135,11 @@ export class OpenAIClient extends LLMClient {
           }));
         }
       } catch (err) {
-        console.log(`[OpenAI] Fetch error for ${endpoint}:`, err);
+        logger.warn('OpenAI model fetch failed', { endpoint, error: String(err) });
       }
     }
 
-    console.log(`[OpenAI] No models found or endpoint not available`);
+    logger.warn('OpenAI model fetch found no models');
     return [];
   }
 
@@ -207,65 +221,51 @@ export class OpenAIClient extends LLMClient {
       throw new Error(`HTTP ${response.status}: ${error}`);
     }
 
-    const reader = response.body?.getReader();
-    if (!reader) {
+    const body = response.body;
+    if (!body) {
       throw new Error('No response body');
     }
 
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
+    for await (const event of readServerSentEvents(body)) {
+      const data = event.data;
+      if (data === '[DONE]') {
         onChunk({ delta: '', done: true });
-        break;
+        return;
       }
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
-          if (data === '[DONE]') {
-            onChunk({ delta: '', done: true });
-            return;
-          }
-          try {
-            const parsed = JSON.parse(data) as OpenAIChatResponse;
-            const choice = parsed.choices?.[0];
-            const delta = choice?.delta?.content || '';
-            const toolCallDeltas = choice?.delta?.tool_calls?.map((toolCall) => ({
-              id: toolCall.id,
-              name: toolCall.function?.name,
-              argumentsDelta: toolCall.function?.arguments,
-              index: toolCall.index,
-            })) ?? [];
-            if (parsed.usage) {
-              onChunk({
-                delta: '',
-                done: false,
-                usage: {
-                  promptTokens: parsed.usage.prompt_tokens,
-                  completionTokens: parsed.usage.completion_tokens,
-                  totalTokens: parsed.usage.total_tokens,
-                },
-              });
-            }
-            if (delta) {
-              onChunk({ delta, done: false });
-            }
-            if (toolCallDeltas.length > 0) {
-              onChunk({ delta: '', done: false, toolCallDeltas });
-            }
-          } catch {
-            // Skip invalid JSON
-          }
+      try {
+        const parsed = JSON.parse(data) as OpenAIChatResponse;
+        const choice = parsed.choices?.[0];
+        const delta = choice?.delta?.content || '';
+        const toolCallDeltas = choice?.delta?.tool_calls?.map((toolCall) => ({
+          id: toolCall.id,
+          name: toolCall.function?.name,
+          argumentsDelta: toolCall.function?.arguments,
+          index: toolCall.index,
+        })) ?? [];
+        if (parsed.usage) {
+          onChunk({
+            delta: '',
+            done: false,
+            usage: {
+              promptTokens: parsed.usage.prompt_tokens,
+              completionTokens: parsed.usage.completion_tokens,
+              totalTokens: parsed.usage.total_tokens,
+            },
+          });
         }
+        if (delta) {
+          onChunk({ delta, done: false });
+        }
+        if (toolCallDeltas.length > 0) {
+          onChunk({ delta: '', done: false, toolCallDeltas });
+        }
+      } catch (error) {
+        logger.warn('Failed to parse OpenAI stream event', { data, error: String(error) });
       }
     }
+
+    onChunk({ delta: '', done: true });
   }
 
   async testConnection(model: string, testMessage?: string): Promise<{ success: boolean; latencyMs: number; error?: string }> {

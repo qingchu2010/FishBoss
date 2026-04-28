@@ -34,6 +34,12 @@ import { getConversationRepository } from "../../../server/domains/conversations
 import { getConversationService } from "../../../server/domains/conversations/service.js";
 import type { AgentSchema } from "../../../server/domains/agents/schemas.js";
 import type { ConversationSchema } from "../../../server/domains/conversations/schemas.js";
+import type { DatabaseMessageThread } from "../../database/schema.js";
+import {
+  QQMessageRecorder,
+  type QQIncomingEventType,
+  type QQIncomingMessageContext,
+} from "./qq-message-recorder.js";
 
 interface GatewayBotResponse {
   url: string;
@@ -46,21 +52,6 @@ interface GatewayPayload {
   d: Record<string, unknown> | number | null;
   s?: number | null;
   t?: string;
-}
-
-type QQIncomingEventType =
-  | "AT_MESSAGE_CREATE"
-  | "GROUP_AT_MESSAGE_CREATE"
-  | "C2C_MESSAGE_CREATE";
-
-interface QQIncomingMessageContext {
-  eventType: QQIncomingEventType;
-  sourceEventId: string;
-  sourceMessageId: string;
-  senderId: string;
-  targetId: string;
-  content: string;
-  sendPayload: Record<string, unknown>;
 }
 
 interface QQReplyProfile {
@@ -382,6 +373,7 @@ class QQGatewayRuntime {
   private readonly agentRepository = getAgentRepository();
   private readonly conversationRepository = getConversationRepository();
   private readonly conversationService = getConversationService();
+  private readonly messageRecorder: QQMessageRecorder;
   private readonly state: PlatformRuntimeStatus = {
     connected: false,
     phase: "idle",
@@ -398,6 +390,7 @@ class QQGatewayRuntime {
 
   constructor(private readonly platform: Platform) {
     this.state.startedAt = this.startedAt;
+    this.messageRecorder = new QQMessageRecorder(platform);
   }
 
   getStatusSnapshot(): PlatformRuntimeStatus {
@@ -701,7 +694,6 @@ class QQGatewayRuntime {
       }
     }
 
-    console.log("QQ inbound message", this.platform.id, context.eventType, context.targetId);
     this.logger.info("QQ inbound message received", {
       platformId: this.platform.id,
       eventType: context.eventType,
@@ -712,16 +704,22 @@ class QQGatewayRuntime {
     });
 
     try {
+      const messageThread = await this.messageRecorder.recordInboundMessage(context);
       const replyProfile = await this.resolveReplyProfile();
       if (!replyProfile) {
         await this.sendFallbackMessage(
           context,
           "FishBoss 未找到可用的回复 Agent 或模型配置。",
+          messageThread,
         );
         return;
       }
 
-      const conversation = await this.resolveConversation(context, replyProfile);
+      const conversation = await this.resolveConversation(
+        context,
+        replyProfile,
+        messageThread?.id,
+      );
       const userMessage = await this.conversationService.appendMessage(
         conversation.id,
         {
@@ -793,7 +791,13 @@ class QQGatewayRuntime {
       if (
         streamingController?.isCompletedSuccessfully
       ) {
-        console.log("QQ outbound reply streamed", this.platform.id, context.targetId);
+        await this.messageRecorder.recordOutboundMessage(context, replyMessage.content, {
+          threadId: messageThread?.id,
+          payload: {
+            streamed: true,
+            conversationId: conversation.id,
+          },
+        });
         this.logger.info("QQ reply streamed", {
           platformId: this.platform.id,
           targetId: context.targetId,
@@ -827,7 +831,14 @@ class QQGatewayRuntime {
         throw new Error("QQ reply send returned null");
       }
 
-      console.log("QQ outbound reply", this.platform.id, context.targetId, sendResult.messageId);
+      await this.messageRecorder.recordOutboundMessage(context, replyMessage.content, {
+        threadId: messageThread?.id,
+        externalMessageId: sendResult.messageId,
+        payload: {
+          conversationId: conversation.id,
+          sendResult,
+        },
+      });
       this.logger.info("QQ reply sent", {
         platformId: this.platform.id,
         targetId: context.targetId,
@@ -835,7 +846,6 @@ class QQGatewayRuntime {
         conversationId: conversation.id,
       });
     } catch (error) {
-      console.error("Failed to handle QQ inbound message", error);
       this.logger.error("Failed to handle QQ inbound message", error, {
         platformId: this.platform.id,
         eventType: context.eventType,
@@ -844,6 +854,7 @@ class QQGatewayRuntime {
       await this.sendFallbackMessage(
         context,
         "FishBoss 暂时无法回复，请检查 Agent、Provider 和模型配置。",
+        undefined,
       );
     }
   }
@@ -891,6 +902,7 @@ class QQGatewayRuntime {
   private async resolveConversation(
     context: QQIncomingMessageContext,
     profile: QQReplyProfile,
+    externalThreadId?: string,
   ): Promise<ConversationSchema> {
     const tags = [
       "platform:qq",
@@ -916,6 +928,10 @@ class QQGatewayRuntime {
             agentId: profile.agentId,
             providerId: profile.providerId,
             modelId: profile.modelId,
+            conversationClass: "qq",
+            platformId: this.platform.id,
+            platformType: this.platform.platformType,
+            externalThreadId,
             tags,
           },
         },
@@ -933,6 +949,10 @@ class QQGatewayRuntime {
         agentId: profile.agentId,
         providerId: profile.providerId,
         modelId: profile.modelId,
+        conversationClass: "qq",
+        platformId: this.platform.id,
+        platformType: this.platform.platformType,
+        externalThreadId,
         tags,
       },
     });
@@ -941,9 +961,10 @@ class QQGatewayRuntime {
   private async sendFallbackMessage(
     context: QQIncomingMessageContext,
     content: string,
+    messageThread?: DatabaseMessageThread | null,
   ): Promise<void> {
     try {
-      await qqAdapter.sendMessage(
+      const result = await qqAdapter.sendMessage(
         this.platform.credentials ?? "",
         this.platform.config,
         context.targetId,
@@ -952,6 +973,13 @@ class QQGatewayRuntime {
           ...context.sendPayload,
         },
       );
+      await this.messageRecorder.recordOutboundMessage(context, content, {
+        threadId: messageThread?.id,
+        externalMessageId: result?.messageId,
+        payload: {
+          fallback: true,
+        },
+      });
     } catch (error) {
       this.logger.error("Failed to send QQ fallback message", error, {
         platformId: this.platform.id,

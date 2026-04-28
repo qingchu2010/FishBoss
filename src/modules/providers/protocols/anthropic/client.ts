@@ -1,5 +1,9 @@
 import { LLMClient, type LLMClientConfig, type ChatCompletionOptions, type ChatCompletionResponse, type ModelInfo } from '../base.js';
 import type { ProviderToolChoice, ProviderToolDefinition, StreamChunk } from '../../../../types/provider.js';
+import { getLogger } from '../../../../server/logging/index.js';
+import { readServerSentEvents } from '../sse.js';
+
+const logger = getLogger();
 
 const ANTHROPIC_MODELS: ModelInfo[] = [
   { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', contextWindow: 200000 },
@@ -136,15 +140,11 @@ export class AnthropicClient extends LLMClient {
       ?.filter((c) => c.type === 'text')
       .map((c) => c.text)
       .join('');
-    const serializedToolCalls = data.content
-      ?.filter((c) => c.type === 'tool_use' && c.name)
-      .map((c) => `<tool_call>${JSON.stringify({ name: c.name, input: c.input ?? {} })}</tool_call>`)
-      .join('') ?? '';
 
     return {
       id: data.id,
       model: data.model,
-      content: `${textContent || ''}${serializedToolCalls}`,
+      content: textContent || '',
       usage: data.usage
         ? {
             promptTokens: data.usage.input_tokens,
@@ -193,76 +193,65 @@ export class AnthropicClient extends LLMClient {
       throw new Error(`HTTP ${response.status}: ${error}`);
     }
 
-    const reader = response.body?.getReader();
-    if (!reader) {
+    const body = response.body;
+    if (!body) {
       throw new Error('No response body');
     }
 
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        onChunk({ delta: '', done: true });
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
-          try {
-            const event = JSON.parse(data) as AnthropicStreamEvent;
-            const usage = event.message?.usage ?? event.usage;
-            if (usage) {
-              const promptTokens = usage.input_tokens;
-              const completionTokens = usage.output_tokens;
-              onChunk({
-                delta: '',
-                done: false,
-                usage: {
-                  promptTokens,
-                  completionTokens,
-                  totalTokens:
-                    (promptTokens ?? 0) + (completionTokens ?? 0),
-                },
-              });
-            }
-            if (event.type === 'content_block_delta' && event.delta?.text) {
-              onChunk({ delta: event.delta.text, done: false });
-            } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
-              onChunk({
-                delta: '',
-                done: false,
-                toolCallDeltas: [{
-                  id: event.content_block.id,
-                  name: event.content_block.name,
-                  argumentsDelta: event.content_block.input ? JSON.stringify(event.content_block.input) : undefined,
-                  index: event.index,
-                }],
-              });
-            } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
-              onChunk({
-                delta: '',
-                done: false,
-                toolCallDeltas: [{
-                  argumentsDelta: event.delta.partial_json,
-                  index: event.index,
-                }],
-              });
-            } else if (event.type === 'message_stop') {
-              onChunk({ delta: '', done: true });
-              return;
-            }
-          } catch {
-          }
+    for await (const message of readServerSentEvents(body)) {
+      const data = message.data;
+      try {
+        const event = JSON.parse(data) as AnthropicStreamEvent;
+        const usage = event.message?.usage ?? event.usage;
+        if (usage) {
+          const promptTokens = usage.input_tokens;
+          const completionTokens = usage.output_tokens;
+          onChunk({
+            delta: '',
+            done: false,
+            usage: {
+              promptTokens,
+              completionTokens,
+              totalTokens:
+                (promptTokens ?? 0) + (completionTokens ?? 0),
+            },
+          });
         }
+        if (event.type === 'content_block_delta' && event.delta?.text) {
+          onChunk({ delta: event.delta.text, done: false });
+        } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+          onChunk({
+            delta: '',
+            done: false,
+            toolCallDeltas: [{
+              id: event.content_block.id,
+              name: event.content_block.name,
+              argumentsDelta: event.content_block.input ? JSON.stringify(event.content_block.input) : undefined,
+              index: event.index,
+            }],
+          });
+        } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
+          onChunk({
+            delta: '',
+            done: false,
+            toolCallDeltas: [{
+              argumentsDelta: event.delta.partial_json,
+              index: event.index,
+            }],
+          });
+        } else if (event.type === 'message_stop') {
+          onChunk({ delta: '', done: true });
+          return;
+        }
+      } catch (error) {
+        logger.warn('Failed to parse Anthropic stream event', {
+          data,
+          error: String(error),
+        });
       }
     }
+
+    onChunk({ delta: '', done: true });
   }
 
   async testConnection(model: string, testMessage?: string): Promise<{ success: boolean; latencyMs: number; error?: string }> {

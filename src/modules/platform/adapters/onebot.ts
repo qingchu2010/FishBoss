@@ -5,6 +5,9 @@ import type {
   SendMessageResult,
 } from '../schema.js';
 import { z } from 'zod';
+import { getLogger } from '../../../server/logging/index.js';
+
+const logger = getLogger();
 
 const OneBotTargetTypeSchema = z.enum(['private', 'group']);
 
@@ -199,7 +202,9 @@ export const onebotAdapter: PlatformAdapter = {
       });
 
       if (!response.ok) {
-        console.error(`OneBot send message failed: ${response.status}`);
+        logger.error('OneBot send message failed', undefined, {
+          status: response.status,
+        });
         return null;
       }
 
@@ -209,7 +214,7 @@ export const onebotAdapter: PlatformAdapter = {
         timestamp: Date.now(),
       };
     } catch (error) {
-      console.error('Failed to send OneBot message:', error);
+      logger.error('Failed to send OneBot message', error);
       return null;
     }
   },

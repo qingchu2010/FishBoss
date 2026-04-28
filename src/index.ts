@@ -13,7 +13,16 @@ export {
   deletePrompt,
   promptExists,
 } from "./prompts/index.js";
-export * from "./types/index.js";
+export * from "./types/conversation.js";
+export * from "./types/agent.js";
+export * from "./types/provider.js";
+export * from "./types/tool.js";
+export {
+  type Workflow,
+  type WorkflowNode,
+} from "./types/workflow.js";
+export * from "./types/mcp.js";
+export * from "./types/skill.js";
 export { registerSystemRoutes, systemVersion } from "./modules/system/index.js";
 export { registerAuthRoutes } from "./modules/auth/index.js";
 export { registerLogsRoutes } from "./modules/logs/index.js";

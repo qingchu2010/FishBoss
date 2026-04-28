@@ -3,14 +3,25 @@ import { getStoragePaths } from "../../storage/index.js";
 import { readdirSync, existsSync, statSync, readFileSync } from "fs";
 import { join } from "path";
 import os from "os";
+import { getLogger } from "../../server/logging/index.js";
 
 const VERSION = "0.1.0";
+const logger = getLogger();
+
+function logStorageReadError(
+  message: string,
+  error: unknown,
+  details: Record<string, string> = {},
+): void {
+  logger.error(message, error, details);
+}
 
 function countFiles(dir: string): number {
   if (!existsSync(dir)) return 0;
   try {
     return readdirSync(dir).length;
-  } catch {
+  } catch (error) {
+    logStorageReadError("Failed to count storage files", error, { dir });
     return 0;
   }
 }
@@ -25,9 +36,17 @@ function getDirSize(dir: string): number {
       try {
         const stat = statSync(filePath);
         size += stat.size;
-      } catch {}
+      } catch (error) {
+        logStorageReadError("Failed to read storage file size", error, {
+          filePath,
+        });
+      }
     }
-  } catch {}
+  } catch (error) {
+    logStorageReadError("Failed to list storage directory size", error, {
+      dir,
+    });
+  }
   return size;
 }
 
@@ -56,9 +75,17 @@ function getProvidersData(storage: ReturnType<typeof getStoragePaths>) {
           models: data.models || [],
           enabled: data.enabled !== false,
         });
-      } catch {}
+      } catch (error) {
+        logStorageReadError("Failed to read provider summary", error, {
+          file,
+        });
+      }
     }
-  } catch {}
+  } catch (error) {
+    logStorageReadError("Failed to list provider summaries", error, {
+      dir: storage.providers,
+    });
+  }
 
   return providers;
 }
@@ -68,7 +95,8 @@ function getAgentsCount(storage: ReturnType<typeof getStoragePaths>): number {
   if (!existsSync(agentsDir)) return 0;
   try {
     return readdirSync(agentsDir).filter((f) => f.endsWith(".json")).length;
-  } catch {
+  } catch (error) {
+    logStorageReadError("Failed to count agents", error, { dir: agentsDir });
     return 0;
   }
 }

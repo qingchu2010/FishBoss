@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { 
   Bot, Cloud, Zap, Boxes, Workflow, 
   MessageSquare, Settings, FolderOpen,
-  Cpu, HardDrive, Clock, ChevronRight,
+  HardDrive, Clock, ChevronRight,
   Activity, Sparkles, ArrowUpRight, Gauge
 } from 'lucide-vue-next'
 import { useI18n } from '@/i18n'
@@ -196,7 +196,7 @@ onMounted(() => {
             </div>
             <div class="stat-body">
               <div class="stat-header">
-                <span class="stat-value">{{ loading ? '—' : stat.value }}</span>
+                <span class="stat-value">{{ loading ? '-' : stat.value }}</span>
                 <span class="stat-sub">{{ stat.sub }}</span>
               </div>
               <span class="stat-label">{{ stat.label }}</span>

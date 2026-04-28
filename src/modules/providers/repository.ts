@@ -7,6 +7,9 @@ import { generateId } from '../../utils/string.js';
 import { encryptProviderApiKey } from './schema.js';
 import { detectProtocol, type ProtocolType } from './protocols/index.js';
 import { resolveVendorConfig } from './vendors/index.js';
+import { getLogger } from '../../server/logging/index.js';
+
+const logger = getLogger();
 
 interface StoredModel {
   id: string;
@@ -56,7 +59,8 @@ export class ProviderRepository {
         const content = await fs.readFile(path.join(this.providersPath, file), 'utf-8');
         const data = JSON.parse(content) as StoredProvider;
         providers.push(this.deserializeProvider(data));
-      } catch {
+      } catch (error) {
+        logger.error('Failed to read provider file', error, { file });
       }
     }
 

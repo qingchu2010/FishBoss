@@ -47,6 +47,10 @@ export interface Conversation {
     agentId?: string
     providerId?: string
     modelId?: string
+    conversationClass?: 'chat-console' | 'qq' | 'onebot' | 'platform'
+    platformId?: string
+    platformType?: string
+    externalThreadId?: string
     tags?: string[]
   }
 }

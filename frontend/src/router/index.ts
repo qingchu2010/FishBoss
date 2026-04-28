@@ -60,12 +60,16 @@ const routes: RouteRecordRaw[] = [
   {
     path: ROUTES.GROUPS,
     name: 'groups',
-    component: () => import('@/views/WorkflowsView.vue')
+    component: () => import('@/views/GroupsView.vue')
   },
   {
-    path: ROUTES.MEDIA,
-    name: 'media',
-    component: () => import('@/views/WorkflowsView.vue')
+    path: ROUTES.DATABASE,
+    name: 'database',
+    component: () => import('@/views/DatabaseView.vue')
+  },
+  {
+    path: '/media',
+    redirect: ROUTES.DATABASE
   },
   {
     path: ROUTES.SETTINGS,

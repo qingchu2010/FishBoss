@@ -31,7 +31,9 @@ const pageMeta = computed(() => {
     '/mcp': { title: t('page.mcpServers.title'), subtitle: t('page.mcpServers.subtitle') },
     '/skills': { title: t('page.skills.title'), subtitle: t('page.skills.subtitle') },
     '/logs': { title: t('page.logs.title'), subtitle: t('page.logs.subtitle') },
-    '/workflows': { title: t('page.default.title'), subtitle: t('page.default.subtitle') }
+    '/workflows': { title: t('page.workflows.title'), subtitle: t('page.workflows.subtitle') },
+    '/groups': { title: t('page.groups.title'), subtitle: t('page.groups.subtitle') },
+    '/database': { title: t('page.database.title'), subtitle: t('page.database.subtitle') }
   }
 
   if (route.path.startsWith('/conversations/')) {

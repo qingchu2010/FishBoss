@@ -1,45 +1,38 @@
 import { ref, computed } from 'vue'
 import { zh_CN, type I18nKeys } from './zh'
-import { en, type I18nKeys as EnI18nKeys } from './en'
+import { en } from './en'
 import { frontendConfigApi } from '@/services/frontend-config'
 
 type I18nLocale = 'zh_CN' | 'en'
+type I18nMessage = string | { [key: string]: I18nMessage }
+type I18nDictionary = { [key: string]: I18nMessage }
 const availableLocales: I18nLocale[] = ['zh_CN', 'en']
 
 const locale = ref<I18nLocale>('zh_CN')
 
-const messages: Record<I18nLocale, I18nKeys | EnI18nKeys> = {
-  zh_CN,
-  en
+const messages: Record<I18nLocale, I18nDictionary> = {
+  zh_CN: zh_CN as I18nDictionary,
+  en: en as I18nDictionary
+}
+
+function resolveMessage(root: I18nDictionary, keys: string[]): I18nMessage | undefined {
+  let current: I18nMessage = root
+  for (const key of keys) {
+    if (typeof current === 'object' && current !== null && key in current) {
+      current = current[key]
+    } else {
+      return undefined
+    }
+  }
+  return current
 }
 
 export function useI18n() {
   const t = (path: string, params?: Record<string, string>): string => {
     const keys = path.split('.')
-    let result: any = messages[locale.value]
-    for (const key of keys) {
-      if (result && typeof result === 'object' && key in result) {
-        result = result[key]
-      } else {
-        if (locale.value === 'zh_CN') {
-          let fallback: any = messages.en
-          for (const k of keys) {
-            if (fallback && typeof fallback === 'object' && k in fallback) {
-              fallback = fallback[k]
-            } else {
-              return path
-            }
-          }
-          if (typeof fallback === 'string') {
-            result = fallback
-          } else {
-            return path
-          }
-        } else {
-          return path
-        }
-        break
-      }
+    let result = resolveMessage(messages[locale.value], keys)
+    if (typeof result !== 'string' && locale.value === 'zh_CN') {
+      result = resolveMessage(messages.en, keys)
     }
     if (typeof result !== 'string') return path
     if (params) {
